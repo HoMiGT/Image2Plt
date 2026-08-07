@@ -1,6 +1,9 @@
+mod config;
+mod converter;
+
 use anyhow::{Context, Result};
-use image2plt::config::AppConfig;
-use image2plt::converter;
+use config::AppConfig;
+
 use rayon::prelude::*;
 
 use std::fs;
