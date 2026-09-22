@@ -1,3 +1,12 @@
+//! `image2plt` CLI 入口模块，负责解析配置，初始化任务，并使用多线程并发处理图像到 PLT 的转换。
+//!
+//! 主要步骤包括：
+//! 1. 加载或生成默认配置文件。
+//! 2. 检查并准备输入和输出目录。
+//! 3. 扫描目标目录中所有支持的图像文件格式。
+//! 4. 结合 `rayon` 进行数据级并行处理。
+//! 5. 汇总并报告转换结果与耗时。
+
 mod config;
 mod converter;
 
@@ -11,6 +20,13 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 use walkdir::WalkDir;
 
+/// 应用程序的主入口函数。
+///
+/// # Errors
+///
+/// 当出现以下情况时，会返回 `anyhow::Result` 错误：
+/// - 读取或创建配置文件 (`config.toml`) 失败。
+/// - 创建必须的输入或输出目录失败。
 fn main() -> Result<()> {
     println!("==================================================");
     println!("  High-Performance Image to PLT (HP-GL) Converter ");

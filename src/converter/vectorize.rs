@@ -1,9 +1,25 @@
+//! 图像矢量化和多边形抽取模块。
+//!
+//! 提供基于二值化图像的轮廓追踪（基于 Suzuki 算法），
+//! 并利用 Ramer-Douglas-Peucker (RDP) 算法来简化过密集的折线节点，输出最终的绘图路径。
+
 use super::{Point, Polyline};
 use crate::config::VectorizeConfig;
 use image::GrayImage;
 use imageproc::contours::find_contours;
 
-/// 提取图像中的所有矢量折线路径
+/// 提取图像中的所有矢量折线路径。
+///
+/// 这是一个入口策略函数，根据配置的模式选择具体的底层提取算法。
+///
+/// # Arguments
+///
+/// * `binary_img` - 经过二值化预处理的图像。
+/// * `config` - 矢量化相关的参数配置（例如 `rdp_epsilon` 和 `min_points`）。
+///
+/// # Returns
+///
+/// 返回一个 `Vec<Polyline>`，其中每个 `Polyline` 是一条独立的、由多点组成的连续路径。
 pub fn extract_polylines(binary_img: &GrayImage, config: &VectorizeConfig) -> Vec<Polyline> {
     if config.mode == "vtracer" {
         // vtracer 高级位图转矢量模式
@@ -14,7 +30,16 @@ pub fn extract_polylines(binary_img: &GrayImage, config: &VectorizeConfig) -> Ve
     }
 }
 
-/// 采用 Suzuki 算法寻找边界轮廓并做 RDP 简化
+/// 采用 Suzuki 算法寻找边界轮廓并做 RDP 简化。
+///
+/// # Arguments
+///
+/// * `binary_img` - 二值化图像。
+/// * `config` - 配置对象。
+///
+/// # Returns
+///
+/// 返回化简后的折线数组。
 fn extract_via_contours(binary_img: &GrayImage, config: &VectorizeConfig) -> Vec<Polyline> {
     // 找到所有前景色 (非零) 的闭合轮廓
     let contours = find_contours::<u32>(binary_img);
@@ -45,13 +70,24 @@ fn extract_via_contours(binary_img: &GrayImage, config: &VectorizeConfig) -> Vec
     result
 }
 
-/// 基于 vtracer 引擎转换矢量
+/// 基于 vtracer 引擎转换矢量（当前回退到轮廓提取）。
 fn extract_via_vtracer(binary_img: &GrayImage, config: &VectorizeConfig) -> Vec<Polyline> {
     // fallback 到 contour 提取或扩展 SVG 解析
     extract_via_contours(binary_img, config)
 }
 
-/// Ramer-Douglas-Peucker (RDP) 折线化简算法
+/// Ramer-Douglas-Peucker (RDP) 折线化简算法。
+///
+/// 递归地将曲线上距离特征连接线小于 `epsilon` 的中间点丢弃，从而在保留形状特征的同时大幅减少点数。
+///
+/// # Arguments
+///
+/// * `points` - 原始密集折线节点的数组。
+/// * `epsilon` - 允许的最大垂直偏离误差（单位通常为像素）。值越大，化简越剧烈。
+///
+/// # Returns
+///
+/// 返回被精简后的新折线节点集合。
 pub fn rdp_simplify(points: &[Point], epsilon: f64) -> Vec<Point> {
     if points.len() <= 2 || epsilon <= 0.0 {
         return points.to_vec();
@@ -86,7 +122,7 @@ pub fn rdp_simplify(points: &[Point], epsilon: f64) -> Vec<Point> {
     }
 }
 
-/// 计算点 p 到由 line_start 和 line_end 确定的直线的垂直距离
+/// 计算点 `p` 到由 `line_start` 和 `line_end` 确定的直线的垂直距离。
 fn perpendicular_distance(p: Point, line_start: Point, line_end: Point) -> f64 {
     let dx = line_end.x - line_start.x;
     let dy = line_end.y - line_start.y;

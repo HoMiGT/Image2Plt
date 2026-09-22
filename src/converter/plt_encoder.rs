@@ -1,8 +1,27 @@
+//! HP-GL (PLT) 编码器模块。
+//!
+//! 负责将几何上的矢量折线转换成绘图仪/切割机可以识别的 HP-GL 控制指令，
+//! 例如 `PU` (Pen Up), `PD` (Pen Down) 和 `SP` (Select Pen)。
+
 use super::Polyline;
 use crate::config::PltConfig;
 use std::fmt::Write;
 
-/// 将折线数组编码为合规的 HP-GL (PLT) 格式文本字符串
+/// 将折线数组编码为合规的 HP-GL (PLT) 格式文本字符串。
+///
+/// 该函数会将给定的矢量路径缩放至目标物理尺寸，并根据配置决定是否进行 Y 轴反转，
+/// 最终输出完整的设备控制指令序列。
+///
+/// # Arguments
+///
+/// * `polylines` - 需要被编码的一组折线，每个折线由连续的点构成。
+/// * `img_width` - 原始图像的像素宽度。
+/// * `img_height` - 原始图像的像素高度。
+/// * `config` - 包含画笔编号、物理单位映射比率等信息的 PLT 编码配置。
+///
+/// # Returns
+///
+/// 返回一个包含合法 HP-GL 指令流的 `String`，可以直接写入到 `.plt` 扩展名的文件中。
 pub fn encode_plt(
     polylines: &[Polyline],
     img_width: u32,

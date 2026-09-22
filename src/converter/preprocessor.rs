@@ -1,9 +1,23 @@
+//! 图像预处理模块。
+//!
+//! 提供将彩色或灰度原始图像转换为去噪后的纯二值图像的功能，
+//! 供后续矢量化步骤使用。
+
 use crate::config::VectorizeConfig;
 use image::{DynamicImage, GrayImage};
 use imageproc::contrast::{threshold, ThresholdType};
 use imageproc::filter::gaussian_blur_f32;
 
-/// 图像预处理 Pipeline：灰度化 -> 高斯滤波 -> 二值化 -> (可选)反转
+/// 图像预处理 Pipeline：灰度化 -> 高斯滤波 -> 二值化 -> (可选)反转。
+///
+/// # Arguments
+///
+/// * `img` - 原始输入的图像，可以是任意彩色或灰度格式。
+/// * `config` - 矢量化配置，包含控制阈值、反转开关等参数。
+///
+/// # Returns
+///
+/// 返回处理完毕、准备提取轮廓的单通道二值化 `GrayImage` (像素值仅包含 0 或 255)。
 pub fn preprocess(img: &DynamicImage, config: &VectorizeConfig) -> GrayImage {
     // 1. 转为 8 位灰度图
     let mut gray = img.to_luma8();
@@ -34,7 +48,18 @@ pub fn preprocess(img: &DynamicImage, config: &VectorizeConfig) -> GrayImage {
     }
 }
 
-/// Otsu 自适应大津二值化阈值算法
+/// Otsu (大津法) 自适应二值化阈值算法。
+///
+/// 通过最大化类间方差，自动计算出图像的最佳全局二值化阈值。
+/// 适用于背景和前景灰度分布呈现双峰特征的图像。
+///
+/// # Arguments
+///
+/// * `gray` - 单通道灰度图像。
+///
+/// # Returns
+///
+/// 返回计算得到的最佳阈值（0~255）。
 fn calculate_otsu_threshold(gray: &GrayImage) -> u8 {
     let mut histogram = [0u64; 256];
     for pixel in gray.pixels() {
