@@ -5,7 +5,7 @@
 
 use crate::config::VectorizeConfig;
 use image::{DynamicImage, GrayImage};
-use imageproc::contrast::{threshold, ThresholdType};
+use imageproc::contrast::{ThresholdType, threshold};
 use imageproc::filter::gaussian_blur_f32;
 
 /// 图像预处理 Pipeline：灰度化 -> 高斯滤波 -> 二值化 -> (可选)反转。
@@ -22,8 +22,11 @@ pub fn preprocess(img: &DynamicImage, config: &VectorizeConfig) -> GrayImage {
     // 1. 转为 8 位灰度图
     let mut gray = img.to_luma8();
 
-    // 2. 高斯轻微模糊以消除轻微像素噪点
-    gray = gaussian_blur_f32(&gray, 0.8);
+    // 2. 已经是纯黑白的图像直接保留像素，避免模糊抹掉细线、缺口或小色块。
+    // 彩色/灰度图仍做轻微高斯去噪。
+    if gray.pixels().any(|pixel| !matches!(pixel.0[0], 0 | 255)) {
+        gray = gaussian_blur_f32(&gray, 0.8);
+    }
 
     // 3. 计算二值化阈值
     let target_threshold = if config.threshold == 0 {
@@ -32,9 +35,8 @@ pub fn preprocess(img: &DynamicImage, config: &VectorizeConfig) -> GrayImage {
         config.threshold
     };
 
-    // 4. 应用二值化 (大于 threshold 设为 255，否则设为 0)
-    let binary = threshold(&gray, target_threshold, ThresholdType::Binary);
-
+    // 4. 轮廓算法以非零像素为前景：默认提取白底上的深色图形。
+    let binary = threshold(&gray, target_threshold, ThresholdType::BinaryInverted);
 
     // 5. 根据配置判断是否反转颜色
     if config.invert {

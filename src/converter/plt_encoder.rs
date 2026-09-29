@@ -1,7 +1,7 @@
 //! HP-GL (PLT) 编码器模块。
 //!
 //! 负责将几何上的矢量折线转换成绘图仪/切割机可以识别的 HP-GL 控制指令，
-//! 例如 `PU` (Pen Up), `PD` (Pen Down) 和 `SP` (Select Pen)。
+//! 例如 `PU` (Pen Up), `PD` (Pen Down)、`SP` (Select Pen) 和 `FP` (Fill Polygon)。
 
 use super::Polyline;
 use crate::config::PltConfig;
@@ -60,8 +60,31 @@ pub fn encode_plt(
         (px, py)
     };
 
-    // 3. 编码轨迹指令
-    for polyline in polylines {
+    // 3. 将闭合轮廓放入同一个多边形缓冲区，奇偶填充会保留孔洞和孔洞中的黑色岛。
+    // 不能逐个轮廓分别填充，否则内部的白色孔洞也会被涂黑。
+    let should_fill =
+        |path: &Polyline| config.fill && path.len() >= 4 && path.first() == path.last();
+    let mut polygon_started = false;
+    for polyline in polylines.iter().filter(|path| should_fill(path)) {
+        if polygon_started {
+            writeln!(plt, "PM1;").unwrap();
+        }
+        let (start_x, start_y) = transform_coord(polyline[0].x, polyline[0].y);
+        writeln!(plt, "PU{},{};", start_x, start_y).unwrap();
+        if !polygon_started {
+            writeln!(plt, "PM0;").unwrap();
+            polygon_started = true;
+        }
+        write_pen_down(&mut plt, polyline, &transform_coord);
+    }
+    if polygon_started {
+        // FT1：实心；FP0：奇偶规则。只填充，不再用 EP 描边，避免边缘被笔宽加粗。
+        // 多边形模式中的 PD 仅记录边界，供 FP 填充使用，不会直接绘制轮廓。
+        plt.push_str("PM2;\nFT1;\nFP0;\n");
+    }
+
+    // 4. 未闭合路径或关闭填充时，仍按普通抬笔/落笔轨迹输出。
+    for polyline in polylines.iter().filter(|path| !should_fill(path)) {
         if polyline.is_empty() {
             continue;
         }
@@ -70,25 +93,33 @@ pub fn encode_plt(
         let (start_x, start_y) = transform_coord(polyline[0].x, polyline[0].y);
         writeln!(plt, "PU{},{};", start_x, start_y).unwrap();
 
-        if polyline.len() > 1 {
-            // 后续节点：PD x1,y1,x2,y2...;
-            plt.push_str("PD");
-            for (idx, pt) in polyline.iter().enumerate().skip(1) {
-                let (cx, cy) = transform_coord(pt.x, pt.y);
-                if idx > 1 {
-                    plt.push(',');
-                }
-                write!(plt, "{},{}", cx, cy).unwrap();
-            }
-            plt.push_str(";\n");
-        }
+        write_pen_down(&mut plt, polyline, &transform_coord);
     }
 
-    // 4. 结尾还原状态
+    // 5. 结尾还原状态
     writeln!(plt, "PU;").unwrap();
     writeln!(plt, "SP0;").unwrap();
 
     plt
+}
+
+fn write_pen_down(
+    plt: &mut String,
+    polyline: &Polyline,
+    transform_coord: &impl Fn(f64, f64) -> (i64, i64),
+) {
+    if polyline.len() < 2 {
+        return;
+    }
+    plt.push_str("PD");
+    for (idx, pt) in polyline.iter().enumerate().skip(1) {
+        let (cx, cy) = transform_coord(pt.x, pt.y);
+        if idx > 1 {
+            plt.push(',');
+        }
+        write!(plt, "{},{}", cx, cy).unwrap();
+    }
+    plt.push_str(";\n");
 }
 
 #[cfg(test)]
@@ -103,6 +134,7 @@ mod tests {
             units_per_mm: 40.0,
             output_width_mm: 100.0,
             flip_y: true,
+            fill: true,
         };
 
         let polylines = vec![vec![Point::new(0.0, 0.0), Point::new(10.0, 20.0)]];
@@ -115,4 +147,3 @@ mod tests {
         assert!(plt.contains("SP0;"));
     }
 }
-

@@ -1,5 +1,5 @@
 //! 提供应用程序和转换引擎所需要的所有配置定义及加载机制。
-//! 
+//!
 //! 支持从 `config.toml` 文件反序列化配置，也包含默认配置的生成。
 
 use anyhow::{Context, Result};
@@ -33,11 +33,11 @@ pub struct VectorizeConfig {
     #[serde(default)]
     pub invert: bool,
 
-    /// Ramer-Douglas-Peucker (RDP) 折线简化容差 (像素单位)，值越大线段越精简平滑
+    /// RDP 折线简化容差 (像素单位)。默认 0，仅合并共线点，精确保留像素边界；正值可能削掉小缺口。
     #[serde(default = "default_rdp_epsilon")]
     pub rdp_epsilon: f64,
 
-    /// 最短闭合/路径最小节点过滤，丢弃噪音噪点 (像素数)
+    /// 最小轮廓周长 (像素边数)，在合并共线点和 RDP 简化之前过滤
     #[serde(default = "default_min_points")]
     pub min_points: usize,
 }
@@ -59,6 +59,10 @@ pub struct PltConfig {
     /// 是否翻转 Y 轴（计算机图像坐标系 Top-Left -> 绘图仪坐标系 Bottom-Left）
     #[serde(default = "default_true")]
     pub flip_y: bool,
+
+    /// 是否实心填充闭合区域（不描边），内部孔洞保留空白；需要设备支持 HP-GL 多边形填充。
+    #[serde(default = "default_true")]
+    pub fill: bool,
 }
 
 /// 默认矢量化模式
@@ -71,7 +75,7 @@ fn default_threshold() -> u8 {
 }
 /// 默认 RDP 容差
 fn default_rdp_epsilon() -> f64 {
-    1.0
+    0.0
 }
 /// 默认最小路径节点数
 fn default_min_points() -> usize {
@@ -99,7 +103,7 @@ impl Default for AppConfig {
                 mode: "contour".to_string(),
                 threshold: 0,
                 invert: false,
-                rdp_epsilon: 1.0,
+                rdp_epsilon: default_rdp_epsilon(),
                 min_points: 3,
             },
             plt: PltConfig {
@@ -107,6 +111,7 @@ impl Default for AppConfig {
                 units_per_mm: 40.0,
                 output_width_mm: 200.0,
                 flip_y: true,
+                fill: true,
             },
         }
     }
