@@ -3,10 +3,13 @@
 # ==================================================
 
 # 待转换图片存放路径 (支持相对路径或绝对路径)
-input_dir = "E:/Downloads/脚环喷码测试_260922/JHCS812_20260922091449/BMP"
+# input_dir = "E:/Downloads/脚环喷码测试_260929/JHCS812_20260922091449/BMP"
+input_dir = "E:/Downloads/脚环喷码测试_260929/JHCS600_20260922092648/BMP"
+
 
 # 转换生成的 PLT (HP-GL) 矢量图保存路径
-output_dir = "E:/Downloads/脚环喷码测试_260922/JHCS812_20260922091449/PLT"
+# output_dir = "E:/Downloads/脚环喷码测试_260929/JHCS812_20260922091449/PLT"
+output_dir = "E:/Downloads/脚环喷码测试_260929/JHCS600_20260922092648/PLT"
 
 # 图像二值化与矢量化路径提取配置
 [vectorize]
